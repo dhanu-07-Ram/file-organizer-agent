@@ -1,7 +1,7 @@
 import os
 import shutil
 import re
-import gradio as gr
+
 
 categories = {
     "Images": [".jpg", ".png", ".jpeg"],
