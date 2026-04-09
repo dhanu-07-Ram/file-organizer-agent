@@ -1,7 +1,7 @@
+import streamlit as st
 import os
 import shutil
 import re
-
 
 categories = {
     "Images": [".jpg", ".png", ".jpeg"],
@@ -29,25 +29,25 @@ def clean_name(filename):
     return name + ext.lower()
 
 
-def organize(files):
-    if not files:
+def organize(uploaded_files):
+    if not uploaded_files:
         return "No files uploaded", None
 
-    if not os.path.exists(base_folder):
-        os.makedirs(base_folder)
+    # Clean previous files
+    if os.path.exists(base_folder):
+        shutil.rmtree(base_folder)
+    os.makedirs(base_folder)
 
     result = []
     count = 0
 
-    for file in files:
-        original = os.path.basename(file.name)
+    for file in uploaded_files:
+        original = file.name
         new_name = clean_name(original)
 
         category = get_category(original)
         folder_path = os.path.join(base_folder, category)
-
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        os.makedirs(folder_path, exist_ok=True)
 
         dest = os.path.join(folder_path, new_name)
 
@@ -57,28 +57,44 @@ def organize(files):
             dest = os.path.join(folder_path, f"{name}_{i}{ext}")
             i += 1
 
-        shutil.copy(file.name, dest)
+        with open(dest, "wb") as f:
+            f.write(file.getbuffer())
 
-        result.append(f"{original} → {category}")
+        result.append(f"📄 {original} → 📁 {category}")
         count += 1
 
-    zip_file = shutil.make_archive("organized_files", "zip", base_folder)
+    # Create ZIP
+    zip_path = shutil.make_archive("organized_files", "zip", base_folder)
 
-    summary = f"Total files processed: {count}\n\n"
+    summary = f"✅ Total files processed: {count}\n\n"
     summary += "\n".join(result)
 
-    return summary, zip_file
+    return summary, zip_path
 
 
-with gr.Blocks() as demo:
-    gr.Markdown("# Smart File Organizer Agent")
+# 🎨 UI
+st.set_page_config(page_title="Smart File Organizer", page_icon="📂")
 
-    files = gr.File(file_count="multiple", label="Upload your files")
-    btn = gr.Button("Organize Files")
+st.title("📂 Smart File Organizer Agent")
+st.write("Upload files and automatically organize them into categories.")
 
-    output = gr.Textbox(label="Result", lines=15)
-    download = gr.File(label="Download ZIP")
+uploaded_files = st.file_uploader("Upload your files", accept_multiple_files=True)
 
-    btn.click(fn=organize, inputs=files, outputs=[output, download])
+if st.button("Organize Files"):
+    if not uploaded_files:
+        st.warning("⚠️ Please upload files first")
+    else:
+        with st.spinner("Organizing your files..."):
+            summary, zip_file = organize(uploaded_files)
 
-demo.launch()
+        st.success("🎉 Files organized successfully!")
+
+        st.text(summary)
+
+        if zip_file:
+            with open(zip_file, "rb") as f:
+                st.download_button(
+                    label="📦 Download Organized ZIP",
+                    data=f,
+                    file_name="organized_files.zip"
+                )
